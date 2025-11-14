@@ -18,58 +18,80 @@ use crate::render_context::render_pass::{ColourAttachment, single_pass_renderpas
 pub struct FinalSingleRenderPass {
     pub render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
-
-    clear_colour: Option<ClearValue>,
+    clear_values: Vec<Option<ClearValue>>,
 }
 impl FinalSingleRenderPass {
     pub fn new(
         device: &Arc<Device>,
-        images: &[Arc<Image>],
-        image_format: Format,
-        depth: Option<Arc<ImageView>>,
+        swap_images: &[Arc<Image>],
+        swap_image_format: Format,
+        images: &[Arc<ImageView>],
+        is_last_depth: bool,
     ) -> Self {
-        // let clear_colour = None;
-        let clear_colour = Some(ClearValue::Float([1.0, 0.0, 1.0, 1.0]));
-        let load_op = if clear_colour.is_none() {
-            AttachmentLoadOp::Load
-        } else {
-            AttachmentLoadOp::Clear
-        };
-        let store_op = AttachmentStoreOp::DontCare;
-
-        let render_pass = single_pass_renderpass(
-            device.clone(),
-            &[ColourAttachment {
-                format: image_format,
+        let n = images.len();
+        let mut colour_attachments = Vec::with_capacity(n);
+        let mut clear_values = Vec::with_capacity(n + 1);
+        // Swapchain is first the first colour attachment
+        let load_op = AttachmentLoadOp::Load;
+        let store_op = AttachmentStoreOp::Store;
+        colour_attachments.push(ColourAttachment {
+            format: swap_image_format,
+            samples: 1,
+            load_op,
+            store_op,
+        });
+        clear_values.push(None);
+        // Other attachments are next, depth being last
+        for image in images {
+            let attachment = ColourAttachment {
+                format: image.format(),
                 samples: 1,
                 load_op,
                 store_op,
-            }],
-            &[0],
-            None,
+            };
+            colour_attachments.push(attachment);
+            let clearvalue = None;
+            clear_values.push(clearvalue);
+        }
+        let (colour, depth_attachment) = if is_last_depth {
+            ((0..n).collect::<Vec<_>>(), Some(n))
+        } else {
+            ((0..=n).collect::<Vec<_>>(), None)
+        };
+
+        let render_pass = single_pass_renderpass(
+            device.clone(),
+            &colour_attachments,
+            &colour,
+            depth_attachment,
         );
 
-        let framebuffers = Self::create_framebuffers(images, &render_pass);
+        let framebuffers = Self::create_framebuffers(swap_images, &images, &render_pass);
         Self {
             render_pass,
             framebuffers,
-            clear_colour,
+            clear_values,
         }
     }
 
     fn create_framebuffers(
-        images: &[Arc<Image>],
+        swap_images: &[Arc<Image>],
+        images: &[Arc<ImageView>],
         render_pass: &Arc<RenderPass>,
     ) -> Vec<Arc<Framebuffer>> {
-        let framebuffers = images
+        let framebuffers = swap_images
             .iter()
             .map(|image| {
                 let final_colour = ImageView::new_default(image.clone()).unwrap();
-
+                let mut attachments = Vec::with_capacity(images.len() + 1);
+                attachments.push(final_colour);
+                for image in images {
+                    attachments.push(image.clone());
+                }
                 Framebuffer::new(
                     render_pass.clone(),
                     FramebufferCreateInfo {
-                        attachments: vec![final_colour],
+                        attachments,
                         ..Default::default()
                     },
                 )
@@ -79,8 +101,8 @@ impl FinalSingleRenderPass {
         framebuffers
     }
 
-    pub fn resize(&mut self, new_images: &[Arc<Image>]) {
-        self.framebuffers = Self::create_framebuffers(new_images, &self.render_pass);
+    pub fn resize(&mut self, new_swap_images: &[Arc<Image>], images: &[Arc<ImageView>]) {
+        self.framebuffers = Self::create_framebuffers(new_swap_images, images, &self.render_pass);
     }
 
     pub fn begin_render_pass(
@@ -92,8 +114,7 @@ impl FinalSingleRenderPass {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![self.clear_colour],
-
+                    clear_values: self.clear_values.clone(),
                     ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_index].clone())
                 },
                 SubpassBeginInfo {

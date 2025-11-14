@@ -34,12 +34,6 @@ impl VulkanContext {
         };
         let instance = Instance::new(library, instance_create_info).unwrap();
 
-        msgln!("All Devices: ");
-        for physical_device in instance.enumerate_physical_devices().unwrap() {
-            print!("   - ");
-            print_infos(&physical_device);
-        }
-
         let required_device_extensions = DeviceExtensions {
             khr_swapchain: true,
             ..Default::default()
@@ -76,6 +70,14 @@ impl VulkanContext {
                 _ => 5,
             })
             .unwrap();
+
+        msgln!("All Devices: ");
+        for physical_device in instance.enumerate_physical_devices().unwrap() {
+            print!("   - ");
+            print_infos(&physical_device);
+        }
+        println!("Current Device: ");
+        print_infos(&physical_device);
 
         let (device, mut queues) = Device::new(
             physical_device,

@@ -1,3 +1,4 @@
+mod game;
 mod render_context;
 mod vulkan;
 
@@ -10,26 +11,27 @@ use winit::{
     window::WindowAttributes,
 };
 
-use crate::{render_context::RenderContext, vulkan::VulkanContext};
+use crate::{game::Game, render_context::RenderContext, vulkan::VulkanContext};
 
 #[macro_export]
 macro_rules! msg {
-    ($val:expr) => {{
-        let val = &$val;
-        print!("[{}:{}:{}] {:?}", file!(), line!(), column!(), val);
+    ($fmt:literal $(, $args:tt)*) => {{
+        print!("[{}:{}:{}] ", file!(), line!(), column!());
+        print!($fmt $(, $args)*);
     }};
 }
 
 #[macro_export]
 macro_rules! msgln {
-    ($val:expr) => {{
-        let val = &$val;
-        println!("[{}:{}:{}] {:?}", file!(), line!(), column!(), val);
+    ($fmt:literal $(, $args:tt)*) => {{
+        print!("[{}:{}:{}] ", file!(), line!(), column!());
+        println!($fmt $(, $args)*);
     }};
 }
 
 struct App {
     vk_ctx: VulkanContext,
+    game: Game,
     r_ctx: Option<RenderContext>,
 }
 impl ApplicationHandler for App {
@@ -57,6 +59,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let r_ctx = self.r_ctx.as_mut().unwrap();
+                r_ctx.renderer.update(1.0 / 120.0, &self.game, &self.vk_ctx);
                 r_ctx.render(&self.vk_ctx);
                 r_ctx.window.request_redraw();
             }
@@ -68,9 +71,9 @@ impl ApplicationHandler for App {
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
-    let vk_ctx = VulkanContext::new(&event_loop);
     let mut app = App {
-        vk_ctx,
+        vk_ctx: VulkanContext::new(&event_loop),
+        game: Game::default(),
         r_ctx: None,
     };
     let _ = event_loop.run_app(&mut app);

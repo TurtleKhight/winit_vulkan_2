@@ -22,13 +22,12 @@ pub struct SingleRenderPass {
 }
 impl SingleRenderPass {
     pub fn new(device: &Arc<Device>, images: Vec<Arc<ImageView>>, is_last_depth: bool) -> Self {
-        let load_op = AttachmentLoadOp::Load;
-        let store_op = AttachmentStoreOp::Store;
-
         let n = images.len();
         let mut colour_attachments = Vec::with_capacity(n);
         let mut clear_values = Vec::with_capacity(n);
         for image in &images {
+            let load_op = AttachmentLoadOp::Load;
+            let store_op = AttachmentStoreOp::Store;
             let attachment = ColourAttachment {
                 format: image.format(),
                 samples: 1,
@@ -37,7 +36,6 @@ impl SingleRenderPass {
             };
             colour_attachments.push(attachment);
             let clearvalue = None;
-            // let clearvalue = Some(ClearValue::Float([1.0, 1.0, 1.0, 1.0]));
             clear_values.push(clearvalue);
         }
         let (colour, depth_attachment) = if is_last_depth {

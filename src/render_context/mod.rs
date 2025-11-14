@@ -1,4 +1,5 @@
 mod render_pass;
+mod renderer;
 
 use std::sync::Arc;
 
@@ -18,8 +19,9 @@ use vulkano::{
 use winit::window::Window;
 
 use crate::{
-    render_context::render_pass::{
-        final_single_pass::FinalSingleRenderPass, single_pass::SingleRenderPass,
+    render_context::{
+        render_pass::{final_single_pass::FinalSingleRenderPass, single_pass::SingleRenderPass},
+        renderer::Renderer,
     },
     vulkan::VulkanContext,
 };
@@ -36,6 +38,8 @@ pub struct RenderContext {
     pub forward_images: Vec<Arc<ImageView>>,
     pub forward_render_pass: SingleRenderPass,
     pub final_render_pass: FinalSingleRenderPass,
+
+    pub renderer: Renderer,
 }
 impl RenderContext {
     pub fn new(window: Arc<Window>, vk_ctx: &VulkanContext) -> Self {
@@ -111,10 +115,17 @@ impl RenderContext {
         )
         .unwrap();
         let forward_images = vec![albedo, depth];
-        let final_render_pass =
-            FinalSingleRenderPass::new(&vk_ctx.device, &images, swapchain.image_format(), None);
+        let final_render_pass = FinalSingleRenderPass::new(
+            &vk_ctx.device,
+            &images,
+            swapchain.image_format(),
+            &[],
+            false,
+        );
         let forward_render_pass =
             SingleRenderPass::new(&vk_ctx.device, forward_images.clone(), true);
+
+        let renderer = Renderer::new(&vk_ctx, forward_render_pass.render_pass.clone());
 
         Self {
             window,
@@ -127,6 +138,7 @@ impl RenderContext {
             forward_images,
             final_render_pass,
             forward_render_pass,
+            renderer,
         }
     }
 
@@ -152,8 +164,8 @@ impl RenderContext {
             self.images = new_images;
 
             self.viewport.extent = [window_size.width as f32, window_size.height as f32];
-            // self.forward_render_pass.resize(&self.images);
-            self.final_render_pass.resize(&self.images);
+            self.forward_render_pass.resize(self.forward_images.clone());
+            self.final_render_pass.resize(&self.images, &[]);
 
             self.recreate_swapchain = false;
         }
@@ -180,6 +192,17 @@ impl RenderContext {
             )
             .unwrap();
 
+        // ===================================================================== Start of Render
+
+        // ===================================================================== Forward Pass
+        self.forward_render_pass
+            .begin_render_pass(&mut builder, self.viewport.clone());
+
+        self.renderer.render_forward_render_pass(&mut builder);
+
+        builder.end_render_pass(Default::default()).unwrap();
+
+        // ===================================================================== Final Pass
         self.final_render_pass.begin_render_pass(
             &mut builder,
             image_index as usize,
@@ -188,11 +211,7 @@ impl RenderContext {
 
         builder.end_render_pass(Default::default()).unwrap();
 
-        self.forward_render_pass
-            .begin_render_pass(&mut builder, self.viewport.clone());
-
-        builder.end_render_pass(Default::default()).unwrap();
-
+        // ===================================================================== End of render
         let command_buffer = builder.build().unwrap();
 
         let future = self
