@@ -1,0 +1,9 @@
+[package]
+name = "winit_vulkan_2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+raw-window-handle = "0.6.2"
+vulkano = "0.35.2"
+winit = "0.30.12"

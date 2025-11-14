@@ -1,0 +1,103 @@
+use std::sync::Arc;
+use vulkano::{
+    command_buffer::{
+        AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo, SubpassBeginInfo,
+        SubpassContents,
+    },
+    device::Device,
+    format::ClearValue,
+    image::view::ImageView,
+    pipeline::graphics::viewport::Viewport,
+    render_pass::{
+        AttachmentLoadOp, AttachmentStoreOp, Framebuffer, FramebufferCreateInfo, RenderPass,
+    },
+};
+
+use crate::render_context::render_pass::{ColourAttachment, single_pass_renderpass};
+
+pub struct SingleRenderPass {
+    pub render_pass: Arc<RenderPass>,
+    framebuffer: Arc<Framebuffer>,
+    clear_values: Vec<Option<ClearValue>>,
+}
+impl SingleRenderPass {
+    pub fn new(device: &Arc<Device>, images: Vec<Arc<ImageView>>, is_last_depth: bool) -> Self {
+        let load_op = AttachmentLoadOp::Load;
+        let store_op = AttachmentStoreOp::Store;
+
+        let n = images.len();
+        let mut colour_attachments = Vec::with_capacity(n);
+        let mut clear_values = Vec::with_capacity(n);
+        for image in &images {
+            let attachment = ColourAttachment {
+                format: image.format(),
+                samples: 1,
+                load_op,
+                store_op,
+            };
+            colour_attachments.push(attachment);
+            let clearvalue = None;
+            // let clearvalue = Some(ClearValue::Float([1.0, 1.0, 1.0, 1.0]));
+            clear_values.push(clearvalue);
+        }
+        let (colour, depth_attachment) = if is_last_depth {
+            ((0..n - 1).collect::<Vec<_>>(), Some(n - 1))
+        } else {
+            ((0..n).collect::<Vec<_>>(), None)
+        };
+
+        let render_pass = single_pass_renderpass(
+            device.clone(),
+            &colour_attachments,
+            &colour,
+            depth_attachment,
+        );
+
+        let framebuffer = Self::create_framebuffer(images, &render_pass);
+        Self {
+            render_pass,
+            framebuffer,
+            clear_values,
+        }
+    }
+
+    fn create_framebuffer(
+        attachments: Vec<Arc<ImageView>>,
+        render_pass: &Arc<RenderPass>,
+    ) -> Arc<Framebuffer> {
+        let framebuffer = Framebuffer::new(
+            render_pass.clone(),
+            FramebufferCreateInfo {
+                attachments,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        framebuffer
+    }
+
+    pub fn resize(&mut self, new_images: Vec<Arc<ImageView>>) {
+        self.framebuffer = Self::create_framebuffer(new_images, &self.render_pass);
+    }
+
+    pub fn begin_render_pass(
+        &self,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        viewport: Viewport,
+    ) {
+        builder
+            .begin_render_pass(
+                RenderPassBeginInfo {
+                    clear_values: self.clear_values.clone(),
+                    ..RenderPassBeginInfo::framebuffer(self.framebuffer.clone())
+                },
+                SubpassBeginInfo {
+                    contents: SubpassContents::Inline,
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .set_viewport(0, [viewport].into_iter().collect())
+            .unwrap();
+    }
+}
