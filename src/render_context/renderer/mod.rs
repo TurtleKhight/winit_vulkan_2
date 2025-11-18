@@ -15,7 +15,7 @@ use crate::{
 };
 
 mod camera;
-mod fill_screen;
+pub mod fill_screen;
 mod sky;
 
 pub struct Renderer {
@@ -28,24 +28,24 @@ pub struct Renderer {
     sky_buffer: Subbuffer<SkyUniform>,
     sky_set: Arc<DescriptorSet>,
 
-    fill_screen: FillScreen,
+    pub fill_screen: FillScreen,
 }
 impl Renderer {
     pub fn new(vk_ctx: &VulkanContext, forward_render_pass: Arc<RenderPass>) -> Self {
-        let camera_layout = CameraUniform::layout(vk_ctx.device.clone());
-        let (camera_buffer, camera_set) = CameraUniform::default().descriptor(
+        let camera_layout = CameraUniform::set_layout(vk_ctx.device.clone());
+        let (camera_buffer, camera_set) = CameraUniform::default().set_desc(
             camera_layout.clone(),
             vk_ctx.mem_alloc.clone(),
             vk_ctx.set_alloc.clone(),
         );
 
-        let sky_layout = SkyUniform::layout(vk_ctx.device.clone());
+        let sky_layout = SkyUniform::set_layout(vk_ctx.device.clone());
         let sky_pipeline = sky::pipeline(
             vk_ctx.device.clone(),
             forward_render_pass.clone(),
             vec![sky_layout.clone()],
         );
-        let (sky_buffer, sky_set) = SkyUniform::default().descriptor(
+        let (sky_buffer, sky_set) = SkyUniform::default().set_desc(
             sky_layout.clone(),
             vk_ctx.mem_alloc.clone(),
             vk_ctx.set_alloc.clone(),
@@ -68,13 +68,13 @@ impl Renderer {
     }
 
     pub fn update(&mut self, dt: f32, game: &Game, vk_ctx: &VulkanContext) {
-        (self.camera_buffer, self.camera_set) = CameraUniform::new(&game.camera).descriptor(
+        (self.camera_buffer, self.camera_set) = CameraUniform::new(&game.camera).set_desc(
             self.camera_layout.clone(),
             vk_ctx.mem_alloc.clone(),
             vk_ctx.set_alloc.clone(),
         );
 
-        (self.sky_buffer, self.sky_set) = SkyUniform::new(&game.camera).descriptor(
+        (self.sky_buffer, self.sky_set) = SkyUniform::new(&game.camera).set_desc(
             self.sky_layout.clone(),
             vk_ctx.mem_alloc.clone(),
             vk_ctx.set_alloc.clone(),

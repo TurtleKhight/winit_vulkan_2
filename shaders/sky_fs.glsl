@@ -14,6 +14,7 @@ layout(set = 0, binding = 0) uniform Data {
 layout(location = 0) out vec4 albedo;
 
 void main() {
+    albedo = vec4(1.0, 0.0, 0.0, 1.0);
     vec4 clip = vec4(f_clip, 0.0, 1.0);
 
     vec4 world_pos = sky.pv_inv_mtx * clip;

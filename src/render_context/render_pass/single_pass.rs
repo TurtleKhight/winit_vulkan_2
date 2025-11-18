@@ -5,7 +5,7 @@ use vulkano::{
         SubpassContents,
     },
     device::Device,
-    format::ClearValue,
+    format::{ClearValue, Format},
     image::view::ImageView,
     pipeline::graphics::viewport::Viewport,
     render_pass::{
@@ -13,7 +13,10 @@ use vulkano::{
     },
 };
 
-use crate::render_context::render_pass::{ColourAttachment, single_pass_renderpass};
+use crate::{
+    msgln,
+    render_context::render_pass::{ColourAttachment, single_pass_renderpass},
+};
 
 pub struct SingleRenderPass {
     pub render_pass: Arc<RenderPass>,
@@ -26,7 +29,12 @@ impl SingleRenderPass {
         let mut colour_attachments = Vec::with_capacity(n);
         let mut clear_values = Vec::with_capacity(n);
         for image in &images {
-            let load_op = AttachmentLoadOp::Load;
+            let load_op = if image.format() == Format::D16_UNORM {
+                AttachmentLoadOp::Clear
+            } else {
+                AttachmentLoadOp::Load
+            };
+            // let load_op = AttachmentLoadOp::Clear;
             let store_op = AttachmentStoreOp::Store;
             let attachment = ColourAttachment {
                 format: image.format(),
@@ -35,9 +43,10 @@ impl SingleRenderPass {
                 store_op,
             };
             colour_attachments.push(attachment);
-            let clearvalue = None;
+            let clearvalue = Self::clear_value(image.format(), load_op);
             clear_values.push(clearvalue);
         }
+
         let (colour, depth_attachment) = if is_last_depth {
             ((0..n - 1).collect::<Vec<_>>(), Some(n - 1))
         } else {
@@ -57,6 +66,19 @@ impl SingleRenderPass {
             framebuffer,
             clear_values,
         }
+    }
+
+    fn clear_value(format: Format, load_op: AttachmentLoadOp) -> Option<ClearValue> {
+        if load_op == AttachmentLoadOp::Clear {
+            match format {
+                Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB => {
+                    return Some(ClearValue::Float([1.0, 0.0, 0.0, 1.0]));
+                }
+                Format::D16_UNORM => return Some(ClearValue::Depth(1.0)),
+                _ => panic!("why am i using this format??? {:?}", format),
+            }
+        }
+        return None;
     }
 
     fn create_framebuffer(

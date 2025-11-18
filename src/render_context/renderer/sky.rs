@@ -137,7 +137,7 @@ impl SkyUniform {
         }
     }
 
-    pub fn layout(device: Arc<Device>) -> Arc<DescriptorSetLayout> {
+    pub fn set_layout(device: Arc<Device>) -> Arc<DescriptorSetLayout> {
         DescriptorSetLayout::new(
             device,
             DescriptorSetLayoutCreateInfo {
@@ -155,7 +155,7 @@ impl SkyUniform {
         .unwrap()
     }
 
-    pub fn descriptor(
+    pub fn set_desc(
         &self,
         layout: Arc<DescriptorSetLayout>,
         mem_alloc: Arc<StandardMemoryAllocator>,

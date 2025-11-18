@@ -31,7 +31,7 @@ impl CameraUniform {
         Self { view, proj }
     }
 
-    pub fn layout(device: Arc<Device>) -> Arc<DescriptorSetLayout> {
+    pub fn set_layout(device: Arc<Device>) -> Arc<DescriptorSetLayout> {
         DescriptorSetLayout::new(
             device,
             DescriptorSetLayoutCreateInfo {
@@ -49,7 +49,7 @@ impl CameraUniform {
         .unwrap()
     }
 
-    pub fn descriptor(
+    pub fn set_desc(
         &self,
         layout: Arc<DescriptorSetLayout>,
         mem_alloc: Arc<StandardMemoryAllocator>,
