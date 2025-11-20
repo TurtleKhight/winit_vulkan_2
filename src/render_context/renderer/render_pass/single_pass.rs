@@ -13,10 +13,8 @@ use vulkano::{
     },
 };
 
-use crate::{
-    msgln,
-    render_context::render_pass::{ColourAttachment, single_pass_renderpass},
-};
+use super::ColourAttachment;
+use super::single_pass_renderpass;
 
 pub struct SingleRenderPass {
     pub render_pass: Arc<RenderPass>,

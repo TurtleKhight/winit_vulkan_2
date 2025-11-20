@@ -13,7 +13,8 @@ use vulkano::{
     },
 };
 
-use crate::render_context::render_pass::{ColourAttachment, single_pass_renderpass};
+use super::ColourAttachment;
+use super::single_pass_renderpass;
 
 pub struct FinalSingleRenderPass {
     pub render_pass: Arc<RenderPass>,
@@ -101,8 +102,8 @@ impl FinalSingleRenderPass {
         framebuffers
     }
 
-    pub fn resize(&mut self, new_swap_images: &[Arc<Image>], images: &[Arc<ImageView>]) {
-        self.framebuffers = Self::create_framebuffers(new_swap_images, images, &self.render_pass);
+    pub fn resize(&mut self, swap_images: &[Arc<Image>], images: &[Arc<ImageView>]) {
+        self.framebuffers = Self::create_framebuffers(swap_images, images, &self.render_pass);
     }
 
     pub fn begin_render_pass(
