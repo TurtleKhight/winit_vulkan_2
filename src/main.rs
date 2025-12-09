@@ -65,7 +65,9 @@ impl ApplicationHandler for App {
         if let winit::event::DeviceEvent::MouseMotion { delta } = event {
             if self.mouse_input.down(0) {
                 let delta = Vector2::new(delta.0 as f32, delta.1 as f32);
-                self.game.camera.mouse_delta(delta);
+                self.game
+                    .camera_controller
+                    .drag_camera(&mut self.game.camera, delta);
             }
         }
     }
@@ -157,37 +159,11 @@ impl App {
     }
 
     fn keyboard_down(&mut self) {
-        let mut forward = 0.0;
-        let mut right = 0.0;
-        let mut up = 0.0;
-        let mut speed = 1.0;
-        if self.keyboard_input.down(KeyCode::KeyW as usize) {
-            forward -= 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::KeyS as usize) {
-            forward += 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::KeyD as usize) {
-            right += 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::KeyA as usize) {
-            right -= 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::Space as usize) {
-            up += 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::ControlLeft as usize) {
-            up -= 1.0;
-        }
-        if self.keyboard_input.down(KeyCode::ShiftLeft as usize) {
-            speed *= 10.0;
-        }
-        let camera = &mut self.game.camera;
-        let dir = camera.dir_flat();
-        let perp_dir = Vector2::new(dir.y, -dir.x);
-        camera.position.x += (perp_dir.x * right + dir.x * forward) * speed * self.dt as f32;
-        camera.position.z += (perp_dir.y * right + dir.y * forward) * speed * self.dt as f32;
-        camera.position.y += up * speed * self.dt as f32;
+        self.game.camera_controller.move_camera(
+            &mut self.game.camera,
+            &self.keyboard_input,
+            self.dt as f32,
+        );
     }
 
     fn mouse_pressed(&mut self, button: MouseButton) {

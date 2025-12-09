@@ -1,17 +1,25 @@
 pub mod camera;
+mod camera_controller;
 
 use camera::Camera;
+
+use crate::game::camera_controller::CameraController;
 // use imgui::Ui;
 
 pub struct Game {
     pub camera: Camera,
+    pub camera_controller: CameraController,
 }
 impl Game {}
 
 impl Default for Game {
     fn default() -> Self {
         let camera: Camera = Camera::default();
-        Self { camera }
+        let camera_controller = CameraController::new();
+        Self {
+            camera,
+            camera_controller,
+        }
     }
 }
 

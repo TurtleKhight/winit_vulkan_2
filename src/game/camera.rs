@@ -27,13 +27,6 @@ impl Camera {
         .normalize()
     }
 
-    pub fn mouse_delta(&mut self, mouse_delta: Vector2<f32>) {
-        let sensitivity = 0.001;
-        let safty = std::f32::consts::FRAC_PI_2 - 0.001;
-        self.pitch = nalgebra::clamp(self.pitch - mouse_delta.y * sensitivity, -safty, safty);
-        self.yaw += mouse_delta.x * sensitivity;
-    }
-
     pub fn resize(&mut self, new_size: Vector2<u32>) {
         self.aspect = new_size.x as f32 / new_size.y as f32;
     }
