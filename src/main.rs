@@ -1,4 +1,5 @@
 mod game;
+mod gui;
 mod input;
 mod render_context;
 mod vulkan;
@@ -78,14 +79,16 @@ impl ApplicationHandler for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
+        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        ren_ctx.gui.input(&event);
+
         match event {
             WindowEvent::CloseRequested => {
                 msgln!("The close button was pressed; stopping");
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                let r_ctx = self.ren_ctx.as_mut().unwrap();
-                r_ctx.recreate_swapchain = true;
+                ren_ctx.recreate_swapchain = true;
             }
             WindowEvent::Focused(focused) => {
                 if !focused {
@@ -94,24 +97,29 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                if event.state.is_pressed() {
-                    self.keyboard_pressed(&event_loop, &event.physical_key);
-                } else {
-                    self.keyboard_released(&event_loop, &event.physical_key);
+                if !ren_ctx.gui.ctx.io().want_capture_keyboard {
+                    if event.state.is_pressed() {
+                        self.keyboard_pressed(&event_loop, &event.physical_key);
+                    } else {
+                        self.keyboard_released(&event_loop, &event.physical_key);
+                    }
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                if state.is_pressed() {
-                    self.mouse_pressed(button);
-                } else {
-                    self.mouse_released(button);
+                if !ren_ctx.gui.ctx.io().want_capture_mouse {
+                    if state.is_pressed() {
+                        self.mouse_pressed(button);
+                    } else {
+                        self.mouse_released(button);
+                    }
                 }
             }
             WindowEvent::RedrawRequested => {
                 self.dt = self.timer.elapsed().as_secs_f32();
                 self.timer = std::time::Instant::now();
                 self.keyboard_down();
-                let ren_ctx = self.ren_ctx.as_mut().unwrap();
+                self.do_ui();
+                let ren_ctx: &mut RenderContext = self.ren_ctx.as_mut().unwrap();
                 ren_ctx.renderer.update(self.dt, &self.game, &self.vk_ctx);
                 ren_ctx.render(&self.vk_ctx);
                 ren_ctx.window.request_redraw();
@@ -122,20 +130,20 @@ impl ApplicationHandler for App {
 }
 impl App {
     fn keyboard_pressed(&mut self, event_loop: &ActiveEventLoop, physical_key: &PhysicalKey) {
+        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+
         match physical_key {
             PhysicalKey::Code(KeyCode::Escape) => {
                 event_loop.exit();
             }
             winit::keyboard::PhysicalKey::Code(KeyCode::F11) => {
-                if let Some(ren_ctx) = &self.ren_ctx {
-                    let window = ren_ctx.window.clone();
-                    match window.fullscreen() {
-                        Some(_) => {
-                            window.set_fullscreen(None);
-                        }
-                        None => {
-                            window.set_fullscreen(Some(Fullscreen::Borderless(None)));
-                        }
+                let window = ren_ctx.window.clone();
+                match window.fullscreen() {
+                    Some(_) => {
+                        window.set_fullscreen(None);
+                    }
+                    None => {
+                        window.set_fullscreen(Some(Fullscreen::Borderless(None)));
                     }
                 }
             }
@@ -167,13 +175,12 @@ impl App {
     }
 
     fn mouse_pressed(&mut self, button: MouseButton) {
+        let ren_ctx = self.ren_ctx.as_mut().unwrap();
         match button {
             MouseButton::Left => {
-                if let Some(ren_ctx) = &self.ren_ctx {
-                    let window = ren_ctx.window.clone();
-                    window.set_cursor_visible(false);
-                    let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
-                }
+                let window = ren_ctx.window.clone();
+                window.set_cursor_visible(false);
+                let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
             }
             _ => {}
         }
@@ -189,13 +196,12 @@ impl App {
     }
 
     fn mouse_released(&mut self, button: MouseButton) {
+        let ren_ctx = self.ren_ctx.as_mut().unwrap();
         match button {
             MouseButton::Left => {
-                if let Some(ren_ctx) = &self.ren_ctx {
-                    let window = ren_ctx.window.clone();
-                    window.set_cursor_visible(true);
-                    let _ = window.set_cursor_grab(winit::window::CursorGrabMode::None);
-                }
+                let window = ren_ctx.window.clone();
+                window.set_cursor_visible(true);
+                let _ = window.set_cursor_grab(winit::window::CursorGrabMode::None);
             }
             _ => {}
         }
@@ -207,6 +213,19 @@ impl App {
             MouseButton::Forward => self.mouse_input.unset(4),
             MouseButton::Other(i) => self.mouse_input.unset(5 + i as usize),
         }
+    }
+
+    fn do_ui(&mut self) {
+        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        ren_ctx
+            .gui
+            .ui(|ui| {
+                ui.window("ImGui Window ").build(|| {
+                    ui.text(format!("FPS: {:.2}", 1.0 / self.dt));
+                    ui.text("Sample Text");
+                });
+            })
+            .unwrap();
     }
 }
 fn main() {

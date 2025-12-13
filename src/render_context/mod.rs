@@ -1,10 +1,12 @@
 mod renderer;
-
 use std::sync::Arc;
 
 use vulkano::{
     Validated, VulkanError,
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
+        PrimaryCommandBufferAbstract,
+    },
     image::{Image, ImageUsage},
     pipeline::graphics::viewport::Viewport,
     swapchain::{
@@ -15,7 +17,7 @@ use vulkano::{
 };
 use winit::window::Window;
 
-use crate::{render_context::renderer::Renderer, vulkan::VulkanContext};
+use crate::{gui::Gui, render_context::renderer::Renderer, vulkan::VulkanContext};
 
 pub struct RenderContext {
     pub window: Arc<Window>,
@@ -28,6 +30,7 @@ pub struct RenderContext {
     pub swapchain_viewport: Viewport,
 
     pub renderer: Renderer,
+    pub gui: Gui,
 }
 impl RenderContext {
     pub fn new(window: Arc<Window>, vk_ctx: &VulkanContext) -> Self {
@@ -74,7 +77,32 @@ impl RenderContext {
             depth_range: 0.0..=1.0,
         };
 
-        let renderer = Renderer::new(&vk_ctx, &images, swapchain.image_format());
+        let mut builder = AutoCommandBufferBuilder::primary(
+            vk_ctx.cmd_alloc.clone(),
+            vk_ctx.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+
+        let renderer = Renderer::new(&vk_ctx, &mut builder, &images, swapchain.image_format());
+
+        let mut gui = Gui::new(
+            vk_ctx.device.clone(),
+            vk_ctx.mem_alloc.clone(),
+            vk_ctx.set_alloc.clone(),
+            vulkano::render_pass::Subpass::from(renderer.get_final_pass(), 0).unwrap(),
+            window.clone(),
+        );
+
+        gui.renderer
+            .reload_font_textures(&mut gui.ctx, &mut builder);
+        let cb = builder.build().unwrap();
+        cb.execute(vk_ctx.queue.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap()
+            .wait(None)
+            .unwrap();
 
         Self {
             window,
@@ -86,6 +114,7 @@ impl RenderContext {
             swapchain_viewport,
 
             renderer,
+            gui,
         }
     }
 
@@ -111,9 +140,7 @@ impl RenderContext {
             self.images = new_images;
 
             self.swapchain_viewport.extent = [window_size.width as f32, window_size.height as f32];
-            self.renderer.render_passes.resize_swap(&self.images);
-            // self.forward_render_pass.resize(self.forward_images.clone());
-            // self.final_render_pass.resize(&self.images, &[]);
+            self.renderer.resize_swap(&self.images);
 
             self.recreate_swapchain = false;
         }
@@ -149,6 +176,7 @@ impl RenderContext {
         // ===================================================================== Final Pass
 
         self.renderer.final_render_pass(
+            &mut self.gui,
             &mut builder,
             image_index as usize,
             self.swapchain_viewport.clone(),

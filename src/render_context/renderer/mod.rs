@@ -15,10 +15,12 @@ use vulkano::{
     pipeline::{
         GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, graphics::viewport::Viewport,
     },
+    render_pass::RenderPass,
 };
 
 use crate::{
     game::Game,
+    gui::Gui,
     render_context::renderer::{
         camera::CameraUniform,
         fill_screen::FillScreen,
@@ -35,7 +37,7 @@ mod render_pass;
 mod sky;
 
 pub struct Renderer {
-    pub render_passes: RenderPasses,
+    render_passes: RenderPasses,
     layouts: Layouts,
     pipelines: Pipelines,
 
@@ -49,7 +51,12 @@ pub struct Renderer {
     fill_screen: FillScreen,
 }
 impl Renderer {
-    pub fn new(vk_ctx: &VulkanContext, swap_images: &[Arc<Image>], swap_format: Format) -> Self {
+    pub fn new(
+        vk_ctx: &VulkanContext,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        swap_images: &[Arc<Image>],
+        swap_format: Format,
+    ) -> Self {
         let render_passes = RenderPasses::new(vk_ctx, swap_images, swap_format);
         let layouts = Layouts::new(vk_ctx.device.clone());
         let pipelines = Pipelines::new(vk_ctx.device.clone(), &layouts, &render_passes);
@@ -103,6 +110,14 @@ impl Renderer {
         }
     }
 
+    pub fn get_final_pass(&self) -> Arc<RenderPass> {
+        return self.render_passes.final_pass.render_pass.clone();
+    }
+
+    pub fn resize_swap(&mut self, images: &[Arc<Image>]) {
+        self.render_passes.resize_swap(images);
+    }
+
     pub fn update(&mut self, dt: f32, game: &Game, vk_ctx: &VulkanContext) {
         (self.camera_buffer, self.camera_set) = CameraUniform::new(&game.camera).set_desc(
             self.layouts.camera.clone(),
@@ -136,6 +151,7 @@ impl Renderer {
 
     pub fn final_render_pass(
         &self,
+        gui: &mut Gui,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         image_index: usize,
         swapchain_viewport: Viewport,
@@ -149,13 +165,14 @@ impl Renderer {
         builder.bind_pipeline_graphics(pipeline.clone()).unwrap();
         bind_descriptor_set(builder, pipeline.layout().clone(), self.blit_desc.clone());
         self.fill_screen.draw(builder);
-
+        // ============================================================================== Gui
+        gui.render(builder);
         // ============================================================================== END
         builder.end_render_pass(Default::default()).unwrap();
     }
 }
 
-pub struct RenderPasses {
+struct RenderPasses {
     final_pass: FinalSingleRenderPass,
     forward_images: Vec<Arc<ImageView>>,
     forward_viewport: Viewport,
@@ -217,7 +234,7 @@ impl RenderPasses {
         return forward_images;
     }
 
-    pub fn resize_swap(&mut self, swap_images: &[Arc<Image>]) {
+    fn resize_swap(&mut self, swap_images: &[Arc<Image>]) {
         self.final_pass.resize(swap_images, &[]);
     }
 }
