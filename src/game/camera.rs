@@ -1,3 +1,4 @@
+use imgui::Ui;
 use nalgebra::{Isometry3, Matrix4, Point3, Vector2, Vector3};
 
 pub struct Camera {
@@ -33,7 +34,9 @@ impl Camera {
 
     pub fn calc_p_mtx(&self) -> Matrix4<f32> {
         let mut proj = Matrix4::new_perspective(self.aspect, self.fovy, self.znear, self.zfar);
-        proj[(1, 1)] *= -1.0;
+        proj[(1, 1)] *= -proj[(1, 1)];
+        // proj[(2, 2)] = self.zfar / (self.znear - self.zfar);
+        // proj[(3, 2)] = (self.zfar * self.znear) / (self.znear - self.zfar);
         return proj;
         // return Matrix4::new_perspective(self.aspect, self.fovy, self.znear, self.zfar);
     }
@@ -57,7 +60,7 @@ impl Default for Camera {
     fn default() -> Self {
         let yaw = 0.0;
         let pitch = 0.0;
-        let position = Point3::new(0.0, 0.0, 3.0);
+        let position = Point3::new(0.0, 0.0, 0.0);
         let znear = 0.01;
         let zfar = 100.0;
         let fovy = (60.0f32).to_radians();
@@ -71,5 +74,25 @@ impl Default for Camera {
             fovy,
             aspect,
         }
+    }
+}
+
+impl Camera {
+    pub fn ui(&mut self, ui: &Ui) {
+        ui.text("Camera");
+        ui.separator();
+        ui.text(format!("Pos: {:.2}", self.position,));
+        ui.text(format!(
+            "euler: {{{:.2}, {:.2}, {:.2}}}",
+            self.yaw.to_degrees(),
+            self.pitch.to_degrees(),
+            std::f32::NAN
+        ));
+        ui.text(format!(
+            "Fov: {:.2} | znear: {:.2} | zfar: {:.2} ",
+            self.fovy.to_degrees(),
+            self.znear,
+            self.zfar
+        ));
     }
 }

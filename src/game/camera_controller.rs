@@ -57,5 +57,7 @@ impl CameraController {
             safty,
         );
         camera.yaw += delta.x * self.drag_sensitivity;
+
+        camera.yaw = camera.yaw.rem_euclid(std::f32::consts::TAU);
     }
 }

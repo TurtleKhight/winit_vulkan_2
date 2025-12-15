@@ -19,7 +19,7 @@ use crate::{
     game::Game,
     input::{KeyboardBinding, MouseBinding},
     render_context::RenderContext,
-    vulkan::VulkanContext,
+    vulkan::{VulkanConfig, VulkanContext},
 };
 
 #[macro_export]
@@ -222,17 +222,40 @@ impl App {
             .ui(|ui| {
                 ui.window("ImGui Window ").build(|| {
                     ui.text(format!("FPS: {:.2}", 1.0 / self.dt));
-                    ui.text("Sample Text");
+                    self.vk_ctx.config.ui(ui);
+                    self.game.camera.ui(&ui);
                 });
             })
             .unwrap();
+        if self.vk_ctx.config.needs_reset() {
+            self.reset_renderer();
+            self.ren_ctx.as_mut().unwrap().gui.ui(|_| {}).unwrap();
+        }
+    }
+
+    fn reset_renderer(&mut self) {
+        if let Some(ren) = self.ren_ctx.take() {
+            let window = ren.window.clone();
+            drop(ren);
+
+            self.vk_ctx = VulkanContext::from_instance(
+                &window,
+                self.vk_ctx.instance.clone(),
+                self.vk_ctx.config.clone(),
+            );
+
+            let render_context = RenderContext::new(window, &self.vk_ctx);
+
+            self.ren_ctx = Some(render_context);
+            self.vk_ctx.config.clear_needs_reset();
+        }
     }
 }
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App {
-        vk_ctx: VulkanContext::new(&event_loop),
+        vk_ctx: VulkanContext::new(&event_loop, VulkanConfig::default()),
         ren_ctx: None,
 
         game: Game::default(),

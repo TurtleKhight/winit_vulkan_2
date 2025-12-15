@@ -13,8 +13,9 @@ use vulkano::{
     memory::allocator::StandardMemoryAllocator,
     swapchain::Surface,
 };
+mod config;
 
-use crate::{msg, msgln};
+pub use config::VulkanConfig;
 
 pub struct VulkanContext {
     pub instance: Arc<Instance>,
@@ -23,9 +24,11 @@ pub struct VulkanContext {
     pub cmd_alloc: Arc<StandardCommandBufferAllocator>,
     pub mem_alloc: Arc<StandardMemoryAllocator>,
     pub set_alloc: Arc<StandardDescriptorSetAllocator>,
+
+    pub config: VulkanConfig,
 }
 impl VulkanContext {
-    pub fn new(display: &impl HasDisplayHandle) -> Self {
+    pub fn new(display: &impl HasDisplayHandle, config: VulkanConfig) -> Self {
         let library = VulkanLibrary::new().unwrap();
         let required_instance_extensions = Surface::required_extensions(&display).unwrap();
         let instance_create_info = InstanceCreateInfo {
@@ -34,6 +37,14 @@ impl VulkanContext {
         };
         let instance = Instance::new(library, instance_create_info).unwrap();
 
+        Self::from_instance(display, instance, config)
+    }
+
+    pub fn from_instance(
+        display: &impl HasDisplayHandle,
+        instance: Arc<Instance>,
+        mut config: VulkanConfig,
+    ) -> Self {
         let required_device_extensions = DeviceExtensions {
             khr_swapchain: true,
             ..Default::default()
@@ -60,24 +71,19 @@ impl VulkanContext {
                     .map(|i| (p, i as u32))
             });
 
-        let (physical_device, queue_family_index) = device_candidates
-            .min_by_key(|(p, _)| match p.properties().device_type {
-                PhysicalDeviceType::DiscreteGpu => 0,
-                PhysicalDeviceType::IntegratedGpu => 1,
-                PhysicalDeviceType::VirtualGpu => 2,
-                PhysicalDeviceType::Cpu => 3,
-                PhysicalDeviceType::Other => 4,
-                _ => 5,
-            })
-            .unwrap();
-
-        msgln!("All Devices: ");
-        for physical_device in instance.enumerate_physical_devices().unwrap() {
-            print!("   - ");
-            print_infos(&physical_device);
+        if config.needs_devices() {
+            config.clear_devices();
+            for physical_device in instance.enumerate_physical_devices().unwrap() {
+                config.add_device(physical_device.clone());
+            }
         }
-        println!("Current Device: ");
-        print_infos(&physical_device);
+        let (physical_device, queue_family_index) =
+            if let Some(target_device) = config.target_device() {
+                find_device(device_candidates, target_device).unwrap()
+            } else {
+                pick_device_match(device_candidates).unwrap()
+            };
+        config.set_current_device(physical_device.clone());
 
         let (device, mut queues) = Device::new(
             physical_device,
@@ -115,14 +121,33 @@ impl VulkanContext {
             cmd_alloc,
             mem_alloc,
             set_alloc,
+            config,
         }
     }
 }
 
-fn print_infos(dev: &PhysicalDevice) {
-    println!(
-        "{} ({:?})",
-        dev.properties().device_name,
-        dev.properties().device_type
-    );
+fn pick_device_match(
+    device_candidates: impl Iterator<Item = (Arc<PhysicalDevice>, u32)>,
+) -> Option<(Arc<PhysicalDevice>, u32)> {
+    device_candidates.min_by_key(|(p, _)| match p.properties().device_type {
+        PhysicalDeviceType::DiscreteGpu => 0,
+        PhysicalDeviceType::IntegratedGpu => 1,
+        PhysicalDeviceType::VirtualGpu => 2,
+        PhysicalDeviceType::Cpu => 3,
+        PhysicalDeviceType::Other => 4,
+        _ => 5,
+    })
+}
+
+fn find_device(
+    device_candidates: impl Iterator<Item = (Arc<PhysicalDevice>, u32)>,
+    device_id: u32,
+) -> Option<(Arc<PhysicalDevice>, u32)> {
+    for candidate in device_candidates {
+        if candidate.0.properties().device_id == device_id {
+            return Some(candidate);
+        }
+    }
+    None
+    // device_candidates.find(|(pd, _)| pd.properties().device_id == device_id)
 }
