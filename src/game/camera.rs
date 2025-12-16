@@ -1,4 +1,4 @@
-use imgui::Ui;
+use imgui::{TreeNodeFlags, Ui};
 use nalgebra::{Isometry3, Matrix4, Point3, Vector2, Vector3};
 
 pub struct Camera {
@@ -79,20 +79,20 @@ impl Default for Camera {
 
 impl Camera {
     pub fn ui(&mut self, ui: &Ui) {
-        ui.text("Camera");
-        ui.separator();
-        ui.text(format!("Pos: {:.2}", self.position,));
-        ui.text(format!(
-            "euler: {{{:.2}, {:.2}, {:.2}}}",
-            self.yaw.to_degrees(),
-            self.pitch.to_degrees(),
-            std::f32::NAN
-        ));
-        ui.text(format!(
-            "Fov: {:.2} | znear: {:.2} | zfar: {:.2} ",
-            self.fovy.to_degrees(),
-            self.znear,
-            self.zfar
-        ));
+        if ui.collapsing_header("Camera", TreeNodeFlags::DEFAULT_OPEN) {
+            ui.text(format!("Pos: {:.2}", self.position,));
+            ui.text(format!(
+                "Euler: {{{:.2}, {:.2}, {:.2}}}",
+                self.yaw.to_degrees(),
+                self.pitch.to_degrees(),
+                std::f32::NAN
+            ));
+            ui.text(format!(
+                "Fov: {:.2} | znear: {:.2} | zfar: {:.2} ",
+                self.fovy.to_degrees(),
+                self.znear,
+                self.zfar
+            ));
+        }
     }
 }

@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use imgui::Ui;
-use vulkano::{
-    device::{Device, physical::PhysicalDevice},
-    format::Format,
-    image::Image,
-};
+use imgui::{TreeNodeFlags, Ui};
+use vulkano::device::physical::PhysicalDevice;
 
 #[derive(Debug, Clone)]
 pub struct VulkanConfig {
@@ -27,10 +23,6 @@ impl Default for VulkanConfig {
     }
 }
 impl VulkanConfig {
-    fn checkbox_requires_reset(&mut self, ui: &Ui, label: impl AsRef<str>, value: &mut bool) {
-        self.needs_reset = ui_checkbox_changed(ui, label, value) || self.needs_reset;
-    }
-
     pub fn needs_devices(&self) -> bool {
         self.current_gpu.is_none()
     }
@@ -66,22 +58,22 @@ impl VulkanConfig {
 
 impl VulkanConfig {
     pub fn ui(&mut self, ui: &Ui) {
-        ui.text("Vulkan Config");
-        ui.separator();
-        ui.text("Current Device");
-        if let Some(device) = &self.current_gpu {
-            ui.text(format!("{}", format_device(device)));
-        } else {
-            ui.text("None");
-        }
-        ui.text("All Devices");
-        for device in &self.gpus {
-            let active = self.current_gpu.as_ref().unwrap().properties().device_id
-                == device.properties().device_id;
-            if ui.radio_button_bool(format!("{}", format_device(device)), active) {
-                // self.set_target_device(device.clone());
-                self.target_gpu = Some(device.clone());
-                self.needs_reset = true;
+        if ui.collapsing_header("Vulkan Config", TreeNodeFlags::DEFAULT_OPEN) {
+            ui.text("Current Device");
+            if let Some(device) = &self.current_gpu {
+                ui.text(format!("{}", format_device(device)));
+            } else {
+                ui.text("None");
+            }
+            ui.text("All Devices");
+            for device in &self.gpus {
+                let active = self.current_gpu.as_ref().unwrap().properties().device_id
+                    == device.properties().device_id;
+                if ui.radio_button_bool(format!("{}", format_device(device)), active) {
+                    // self.set_target_device(device.clone());
+                    self.target_gpu = Some(device.clone());
+                    self.needs_reset = true;
+                }
             }
         }
     }

@@ -18,7 +18,7 @@ use winit::{
 use crate::{
     game::Game,
     input::{KeyboardBinding, MouseBinding},
-    render_context::RenderContext,
+    render_context::{RenderConfig, RenderContext},
     vulkan::{VulkanConfig, VulkanContext},
 };
 
@@ -53,7 +53,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = WindowAttributes::default();
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-        let ren_ctx = RenderContext::new(window, &self.vk_ctx);
+        let ren_ctx = RenderContext::new(window, &self.vk_ctx, RenderConfig::default(), None);
         self.ren_ctx = Some(ren_ctx);
     }
 
@@ -223,6 +223,9 @@ impl App {
                 ui.window("ImGui Window ").build(|| {
                     ui.text(format!("FPS: {:.2}", 1.0 / self.dt));
                     self.vk_ctx.config.ui(ui);
+                    ren_ctx
+                        .config
+                        .ui(ui, &ren_ctx.swapchain, &mut ren_ctx.recreate_swapchain);
                     self.game.camera.ui(&ui);
                 });
             })
@@ -236,15 +239,17 @@ impl App {
     fn reset_renderer(&mut self) {
         if let Some(ren) = self.ren_ctx.take() {
             let window = ren.window.clone();
-            drop(ren);
-
+            // TODO: configs dont need to be clone
             self.vk_ctx = VulkanContext::from_instance(
                 &window,
                 self.vk_ctx.instance.clone(),
                 self.vk_ctx.config.clone(),
             );
-
-            let render_context = RenderContext::new(window, &self.vk_ctx);
+            let config = ren.config;
+            // let gui = ren.gui;
+            drop(ren);
+            let render_context = RenderContext::new(window, &self.vk_ctx, config, None);
+            // let render_context = ren.recreate(&self.vk_ctx);
 
             self.ren_ctx = Some(render_context);
             self.vk_ctx.config.clear_needs_reset();

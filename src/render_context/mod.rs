@@ -1,6 +1,4 @@
-mod renderer;
 use std::sync::Arc;
-
 use vulkano::{
     Validated, VulkanError,
     command_buffer::{
@@ -10,14 +8,24 @@ use vulkano::{
     image::{Image, ImageUsage},
     pipeline::graphics::viewport::Viewport,
     swapchain::{
-        PresentMode, Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
-        acquire_next_image,
+        Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
     },
     sync::GpuFuture,
 };
 use winit::window::Window;
 
-use crate::{gui::Gui, render_context::renderer::Renderer, vulkan::VulkanContext};
+use crate::{gui::Gui, msgln, vulkan::VulkanContext};
+
+mod config;
+mod renderer;
+
+pub use config::RenderConfig;
+use renderer::Renderer;
+
+pub struct RenderContextCashable {
+    pub gui: Gui,
+    pub config: RenderConfig,
+}
 
 pub struct RenderContext {
     pub window: Arc<Window>,
@@ -31,9 +39,15 @@ pub struct RenderContext {
 
     pub renderer: Renderer,
     pub gui: Gui,
+    pub config: RenderConfig,
 }
 impl RenderContext {
-    pub fn new(window: Arc<Window>, vk_ctx: &VulkanContext) -> Self {
+    pub fn new(
+        window: Arc<Window>,
+        vk_ctx: &VulkanContext,
+        config: RenderConfig,
+        gui: Option<Gui>,
+    ) -> Self {
         let surface = Surface::from_window(vk_ctx.instance.clone(), window.clone()).unwrap();
         let window_size = window.inner_size();
         let (swapchain, images) = {
@@ -43,22 +57,25 @@ impl RenderContext {
                 .surface_capabilities(&surface, Default::default())
                 .unwrap();
 
-            let (image_format, _) = vk_ctx
+            let surface_formats = vk_ctx
                 .device
                 .physical_device()
                 .surface_formats(&surface, Default::default())
-                .unwrap()[0];
+                .unwrap();
 
+            let (image_format, image_color_space) = surface_formats[0];
+
+            msgln!("{:?} {:?}", image_format, image_color_space);
             Swapchain::new(
                 vk_ctx.device.clone(),
                 surface,
                 SwapchainCreateInfo {
                     min_image_count: surface_capabilities.min_image_count.max(2),
                     image_format,
-                    // image_format: vulkano::format::Format::R8G8B8A8_SRGB,
+                    // image_format: vulkano::format::Format::B8G8R8A8_SRGB,
                     image_extent: window_size.into(),
                     image_usage: ImageUsage::COLOR_ATTACHMENT,
-                    present_mode: PresentMode::Fifo,
+                    present_mode: config.present_mode(),
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
                         .into_iter()
@@ -86,15 +103,22 @@ impl RenderContext {
 
         let renderer = Renderer::new(&vk_ctx, &mut builder, &images, swapchain.image_format());
 
-        let mut gui = Gui::new(
+        let mut gui = if let Some(gui) = gui {
+            gui
+        } else {
+            let gui = Gui::new(window.clone());
+            gui
+        };
+        gui.new_renderer(
             vk_ctx.device.clone(),
             vk_ctx.mem_alloc.clone(),
             vk_ctx.set_alloc.clone(),
             vulkano::render_pass::Subpass::from(renderer.get_final_pass(), 0).unwrap(),
             window.clone(),
         );
-
         gui.renderer
+            .as_mut()
+            .unwrap()
             .reload_font_textures(&mut gui.ctx, &mut builder);
         let cb = builder.build().unwrap();
         cb.execute(vk_ctx.queue.clone())
@@ -115,6 +139,7 @@ impl RenderContext {
 
             renderer,
             gui,
+            config,
         }
     }
 
@@ -132,6 +157,7 @@ impl RenderContext {
                 .swapchain
                 .recreate(SwapchainCreateInfo {
                     image_extent: window_size.into(),
+                    present_mode: self.config.present_mode(),
                     ..self.swapchain.create_info()
                 })
                 .expect("failed to recreate swapchain");

@@ -29,7 +29,7 @@ impl FillScreen {
             position: Vector2::new(3.0, -1.0),
         };
         let vertices = [v0, v1, v2];
-        let indices = [0, 1, 2];
+        // let indices = [0, 1, 2];
 
         let vertex_buffer = Buffer::from_iter(
             mem_alloc,
@@ -62,7 +62,7 @@ impl FillScreen {
             position: Vector2::new(1.0, 1.0),
         };
         let vertices = [v0, v1, v2, v3];
-        let indices = [0, 1, 2, 0, 2, 3];
+        // let indices = [0, 1, 2, 0, 2, 3];
 
         let vertex_buffer = Buffer::from_iter(
             mem_alloc,

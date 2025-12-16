@@ -51,32 +51,25 @@ use winit::{
 pub struct Gui {
     pub ctx: imgui::Context,
     pub platform: WinitPlatform,
-    pub renderer: Renderer,
     pub window: Arc<Window>,
+    pub renderer: Option<Renderer>,
 }
 impl Gui {
-    pub fn new(
-        device: Arc<Device>,
-        mem_allocator: Arc<StandardMemoryAllocator>,
-        set_allocator: Arc<StandardDescriptorSetAllocator>,
-        subpass: Subpass,
-        window: Arc<Window>,
-    ) -> Self {
+    pub fn new(window: Arc<Window>) -> Self {
         let mut ctx = imgui::Context::create();
         let mut platform = WinitPlatform::new(&mut ctx);
         platform.attach_window(ctx.io_mut(), &window, HiDpiMode::Default);
         ctx.set_platform_name("Winit".to_owned());
         ctx.set_renderer_name("Vulkano".to_owned());
 
-        let renderer = Renderer::new(device, mem_allocator, set_allocator, subpass);
-
         Self {
             ctx,
             platform,
-            renderer,
+            renderer: None,
             window,
         }
     }
+
     pub fn input(&mut self, event: &WindowEvent) {
         self.platform.handle_event(
             self.ctx.io_mut(),
@@ -87,6 +80,7 @@ impl Gui {
             },
         );
     }
+
     pub fn ui(&mut self, content: impl FnOnce(&mut imgui::Ui)) -> Result<(), ExternalError> {
         self.platform
             .prepare_frame(self.ctx.io_mut(), &self.window)?;
@@ -95,9 +89,24 @@ impl Gui {
         self.platform.prepare_render(ui, &self.window);
         Ok(())
     }
+
+    pub fn new_renderer(
+        &mut self,
+        device: Arc<Device>,
+        mem_allocator: Arc<StandardMemoryAllocator>,
+        set_allocator: Arc<StandardDescriptorSetAllocator>,
+        subpass: Subpass,
+        window: Arc<Window>,
+    ) {
+        self.window = window;
+        self.renderer = Some(Renderer::new(device, mem_allocator, set_allocator, subpass));
+    }
+
     pub fn render<L>(&mut self, builder: &mut AutoCommandBufferBuilder<L>) {
         let draw_data = self.ctx.render();
-        self.renderer.render(builder, draw_data);
+        if let Some(renderer) = &mut self.renderer {
+            renderer.render(builder, draw_data);
+        }
     }
 }
 
@@ -174,6 +183,7 @@ impl Texture {
 }
 
 pub struct Renderer {
+    device: Arc<Device>,
     mem_allocator: Arc<StandardMemoryAllocator>,
     set_allocator: Arc<StandardDescriptorSetAllocator>,
 
@@ -294,7 +304,7 @@ impl Renderer {
         let textures = imgui::Textures::new();
 
         let sampler = Sampler::new(
-            device,
+            device.clone(),
             SamplerCreateInfo {
                 mag_filter: Filter::Linear,
                 min_filter: Filter::Linear,
@@ -325,6 +335,7 @@ impl Renderer {
         );
 
         Self {
+            device,
             mem_allocator,
             set_allocator,
             vertex_buffers: vertex_buffer,
