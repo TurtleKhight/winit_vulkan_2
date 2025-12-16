@@ -70,9 +70,10 @@ impl VulkanConfig {
                 let active = self.current_gpu.as_ref().unwrap().properties().device_id
                     == device.properties().device_id;
                 if ui.radio_button_bool(format!("{}", format_device(device)), active) {
-                    // self.set_target_device(device.clone());
-                    self.target_gpu = Some(device.clone());
-                    self.needs_reset = true;
+                    if !active {
+                        self.target_gpu = Some(device.clone());
+                        self.needs_reset = true;
+                    }
                 }
             }
         }

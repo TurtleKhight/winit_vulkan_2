@@ -2,6 +2,7 @@ mod game;
 mod gui;
 mod input;
 mod render_context;
+mod sysinfo;
 mod vulkan;
 
 use std::sync::Arc;
@@ -19,6 +20,7 @@ use crate::{
     game::Game,
     input::{KeyboardBinding, MouseBinding},
     render_context::{RenderConfig, RenderContext},
+    sysinfo::SysInfo,
     vulkan::{VulkanConfig, VulkanContext},
 };
 
@@ -45,6 +47,8 @@ struct App {
     game: Game,
     timer: std::time::Instant,
     dt: f32,
+
+    sysinfo: SysInfo,
 
     keyboard_input: KeyboardBinding,
     mouse_input: MouseBinding,
@@ -88,7 +92,9 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
+                let size = Vector2::new(size.width, size.height);
                 ren_ctx.recreate_swapchain = true;
+                self.game.camera.resize(size);
             }
             WindowEvent::Focused(focused) => {
                 if !focused {
@@ -119,6 +125,7 @@ impl ApplicationHandler for App {
                 self.timer = std::time::Instant::now();
                 self.keyboard_down();
                 self.do_ui();
+                self.sysinfo.update(self.dt);
                 let ren_ctx: &mut RenderContext = self.ren_ctx.as_mut().unwrap();
                 ren_ctx.renderer.update(self.dt, &self.game, &self.vk_ctx);
                 ren_ctx.render(&self.vk_ctx);
@@ -221,7 +228,7 @@ impl App {
             .gui
             .ui(|ui| {
                 ui.window("ImGui Window ").build(|| {
-                    ui.text(format!("FPS: {:.2}", 1.0 / self.dt));
+                    self.sysinfo.ui(ui);
                     self.vk_ctx.config.ui(ui);
                     ren_ctx
                         .config
@@ -232,7 +239,6 @@ impl App {
             .unwrap();
         if self.vk_ctx.config.needs_reset() {
             self.reset_renderer();
-            self.ren_ctx.as_mut().unwrap().gui.ui(|_| {}).unwrap();
         }
     }
 
@@ -245,11 +251,16 @@ impl App {
                 self.vk_ctx.instance.clone(),
                 self.vk_ctx.config.clone(),
             );
-            let config = ren.config;
-            // let gui = ren.gui;
-            drop(ren);
-            let render_context = RenderContext::new(window, &self.vk_ctx, config, None);
-            // let render_context = ren.recreate(&self.vk_ctx);
+            let (config, gui) = {
+                let ren = ren;
+
+                let config = ren.config;
+                let mut gui = ren.gui;
+                let _ = gui.ctx.render();
+                gui.renderer = None;
+                (config, gui)
+            };
+            let render_context = RenderContext::new(window, &self.vk_ctx, config, Some(gui));
 
             self.ren_ctx = Some(render_context);
             self.vk_ctx.config.clear_needs_reset();
@@ -259,6 +270,7 @@ impl App {
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
+
     let mut app = App {
         vk_ctx: VulkanContext::new(&event_loop, VulkanConfig::default()),
         ren_ctx: None,
@@ -266,6 +278,8 @@ fn main() {
         game: Game::default(),
         dt: 1.0,
         timer: std::time::Instant::now(),
+
+        sysinfo: SysInfo::new(),
 
         keyboard_input: KeyboardBinding::new(),
         mouse_input: MouseBinding::new(),

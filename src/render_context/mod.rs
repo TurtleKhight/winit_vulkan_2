@@ -8,7 +8,8 @@ use vulkano::{
     image::{Image, ImageUsage},
     pipeline::graphics::viewport::Viewport,
     swapchain::{
-        Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
+        Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
+        acquire_next_image,
     },
     sync::GpuFuture,
 };
@@ -22,7 +23,7 @@ mod renderer;
 pub use config::RenderConfig;
 use renderer::Renderer;
 
-pub struct RenderContextCashable {
+pub struct RenderContextInvariant {
     pub gui: Gui,
     pub config: RenderConfig,
 }
@@ -45,7 +46,7 @@ impl RenderContext {
     pub fn new(
         window: Arc<Window>,
         vk_ctx: &VulkanContext,
-        config: RenderConfig,
+        mut config: RenderConfig,
         gui: Option<Gui>,
     ) -> Self {
         let surface = Surface::from_window(vk_ctx.instance.clone(), window.clone()).unwrap();
@@ -63,9 +64,15 @@ impl RenderContext {
                 .surface_formats(&surface, Default::default())
                 .unwrap();
 
-            let (image_format, image_color_space) = surface_formats[0];
+            let (image_format, _) = surface_formats[0];
 
-            msgln!("{:?} {:?}", image_format, image_color_space);
+            let modes = vk_ctx
+                .device
+                .physical_device()
+                .surface_present_modes(&surface, SurfaceInfo::default())
+                .unwrap();
+            config.fallback_present_mode(&modes);
+
             Swapchain::new(
                 vk_ctx.device.clone(),
                 surface,
