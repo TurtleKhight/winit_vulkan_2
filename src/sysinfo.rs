@@ -3,6 +3,8 @@ use std::time::{Duration, Instant};
 use imgui::{TreeNodeFlags, Ui};
 use sysinfo::{Pid, System};
 
+use crate::msgln;
+
 pub struct SysInfo {
     average_fps: ArrayDeque<f32, 50>,
     sysinfo: System,
@@ -44,10 +46,11 @@ impl SysInfo {
 impl SysInfo {
     pub fn ui(&self, ui: &Ui) {
         if ui.collapsing_header("System Info", TreeNodeFlags::DEFAULT_OPEN) {
+            ui.plot_lines("Fps", &self.average_fps.linear()).build();
             let mem_usage = self.mem_usage / (1024 * 1024);
             let vir_mem_usage = self.vir_mem_usage / (1024 * 1024);
             let avg = self.average_fps.sum() / self.average_fps.buf.len() as f32;
-            ui.text(format!("Avg FPS: {:.2}", 1.0 / avg));
+            ui.text(format!("Avg FPS: {}", (1.0 / avg).round() as u32));
             ui.text(format!("Memory usage: {} MB", mem_usage));
             ui.text(format!("Virtual memory: {} MB", vir_mem_usage));
         }
@@ -79,5 +82,18 @@ impl<T: Default + Copy + std::ops::Add<Output = T>, const N: usize> ArrayDeque<T
             avg = avg + val;
         }
         avg
+    }
+
+    fn linear(&self) -> [T; N] {
+        let mut out = [T::default(); N];
+
+        let start = (self.head + N - self.len.min(N)) % N;
+        let len = self.len.min(N);
+
+        for i in 0..len {
+            out[i] = self.buf[(start + i) % N];
+        }
+
+        out
     }
 }

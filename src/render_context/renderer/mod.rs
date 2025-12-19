@@ -21,6 +21,7 @@ use vulkano::{
 use crate::{
     game::Game,
     gui::Gui,
+    msgln,
     render_context::renderer::{
         camera::CameraUniform,
         fill_screen::FillScreen,
@@ -56,8 +57,9 @@ impl Renderer {
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         swap_images: &[Arc<Image>],
         swap_format: Format,
+        extent: [u32; 3],
     ) -> Self {
-        let render_passes = RenderPasses::new(vk_ctx, swap_images, swap_format);
+        let render_passes = RenderPasses::new(vk_ctx, swap_images, swap_format, extent);
         let layouts = Layouts::new(vk_ctx.device.clone());
         let pipelines = Pipelines::new(vk_ctx.device.clone(), &layouts, &render_passes);
 
@@ -75,21 +77,10 @@ impl Renderer {
             vk_ctx.set_alloc.clone(),
         );
 
-        let sampler = Sampler::new(
-            vk_ctx.device.clone(),
-            SamplerCreateInfo {
-                mag_filter: Filter::Linear,
-                min_filter: Filter::Linear,
-                mipmap_mode: SamplerMipmapMode::Linear,
-                address_mode: [SamplerAddressMode::ClampToEdge; 3],
-                ..Default::default()
-            },
-        )
-        .unwrap();
         let blit_desc = draw_texture::set_desc(
             layouts.blit_texture.clone(),
             vk_ctx.set_alloc.clone(),
-            sampler,
+            render_passes.sampler.clone(),
             render_passes.forward_images[0].clone(),
         );
 
@@ -114,8 +105,25 @@ impl Renderer {
         return self.render_passes.final_pass.render_pass.clone();
     }
 
+    pub fn extent(&self) -> [u32; 3] {
+        self.render_passes.extent()
+    }
+
     pub fn resize_swap(&mut self, images: &[Arc<Image>]) {
         self.render_passes.resize_swap(images);
+    }
+
+    pub fn resize_buffers(&mut self, vk_ctx: &VulkanContext, extent: [u32; 3]) {
+        self.render_passes
+            .resize_buffers(vk_ctx.device.clone(), vk_ctx.mem_alloc.clone(), extent);
+        // self.pipelines = Pipelines::new(vk_ctx.device.clone(), &self.layouts, &self.render_passes);
+
+        self.blit_desc = draw_texture::set_desc(
+            self.layouts.blit_texture.clone(),
+            vk_ctx.set_alloc.clone(),
+            self.render_passes.sampler.clone(),
+            self.render_passes.forward_images[0].clone(),
+        );
     }
 
     pub fn update(&mut self, dt: f32, game: &Game, vk_ctx: &VulkanContext) {
@@ -177,24 +185,44 @@ struct RenderPasses {
     forward_images: Vec<Arc<ImageView>>,
     forward_viewport: Viewport,
     forward_pass: SingleRenderPass,
+    sampler: Arc<Sampler>,
 }
 impl RenderPasses {
-    fn new(vk_ctx: &VulkanContext, swap_images: &[Arc<Image>], swap_format: Format) -> Self {
-        let extent = [256, 256, 1];
+    fn new(
+        vk_ctx: &VulkanContext,
+        swap_images: &[Arc<Image>],
+        swap_format: Format,
+        extent: [u32; 3],
+    ) -> Self {
         let forward_viewport = Viewport {
             offset: [0.0, 0.0],
             extent: [extent[0] as f32, extent[1] as f32],
             depth_range: 0.0..=1.0,
         };
         let forward_images = Self::forward_images(vk_ctx.mem_alloc.clone(), extent);
+        let forward_pass =
+            SingleRenderPass::new(vk_ctx.device.clone(), forward_images.clone(), true);
         let final_pass =
-            FinalSingleRenderPass::new(&vk_ctx.device, swap_images, swap_format, &[], false);
-        let forward_pass = SingleRenderPass::new(&vk_ctx.device, forward_images.clone(), true);
+            FinalSingleRenderPass::new(vk_ctx.device.clone(), swap_images, swap_format, &[], false);
+
+        let filer = Filter::Nearest;
+        let sampler = Sampler::new(
+            vk_ctx.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: filer,
+                min_filter: filer,
+                mipmap_mode: SamplerMipmapMode::Linear,
+                address_mode: [SamplerAddressMode::ClampToEdge; 3],
+                ..Default::default()
+            },
+        )
+        .unwrap();
         Self {
             final_pass,
             forward_pass,
             forward_images,
             forward_viewport,
+            sampler,
         }
     }
 
@@ -236,6 +264,23 @@ impl RenderPasses {
 
     fn resize_swap(&mut self, swap_images: &[Arc<Image>]) {
         self.final_pass.resize(swap_images, &[]);
+    }
+
+    fn extent(&self) -> [u32; 3] {
+        self.forward_images[0].image().extent()
+    }
+
+    fn resize_buffers(
+        &mut self,
+        device: Arc<Device>,
+        mem_alloc: Arc<StandardMemoryAllocator>,
+        extent: [u32; 3],
+    ) {
+        msgln!("RESIZING TO: {:?}", extent);
+        self.forward_viewport.extent = [extent[0] as f32, extent[1] as f32];
+        self.forward_images = Self::forward_images(mem_alloc, extent);
+        self.forward_pass =
+            SingleRenderPass::new(device.clone(), self.forward_images.clone(), true);
     }
 }
 

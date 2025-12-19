@@ -22,7 +22,7 @@ pub struct SingleRenderPass {
     clear_values: Vec<Option<ClearValue>>,
 }
 impl SingleRenderPass {
-    pub fn new(device: &Arc<Device>, images: Vec<Arc<ImageView>>, is_last_depth: bool) -> Self {
+    pub fn new(device: Arc<Device>, images: Vec<Arc<ImageView>>, is_last_depth: bool) -> Self {
         let n = images.len();
         let mut colour_attachments = Vec::with_capacity(n);
         let mut clear_values = Vec::with_capacity(n);
@@ -51,14 +51,10 @@ impl SingleRenderPass {
             ((0..n).collect::<Vec<_>>(), None)
         };
 
-        let render_pass = single_pass_renderpass(
-            device.clone(),
-            &colour_attachments,
-            &colour,
-            depth_attachment,
-        );
+        let render_pass =
+            single_pass_renderpass(device, &colour_attachments, &colour, depth_attachment);
 
-        let framebuffer = Self::create_framebuffer(images, &render_pass);
+        let framebuffer = Self::create_framebuffer(images, render_pass.clone());
         Self {
             render_pass,
             framebuffer,
@@ -81,10 +77,10 @@ impl SingleRenderPass {
 
     fn create_framebuffer(
         attachments: Vec<Arc<ImageView>>,
-        render_pass: &Arc<RenderPass>,
+        render_pass: Arc<RenderPass>,
     ) -> Arc<Framebuffer> {
         let framebuffer = Framebuffer::new(
-            render_pass.clone(),
+            render_pass,
             FramebufferCreateInfo {
                 attachments,
                 ..Default::default()
@@ -95,7 +91,7 @@ impl SingleRenderPass {
     }
 
     pub fn resize(&mut self, new_images: Vec<Arc<ImageView>>) {
-        self.framebuffer = Self::create_framebuffer(new_images, &self.render_pass);
+        self.framebuffer = Self::create_framebuffer(new_images, self.render_pass.clone());
     }
 
     pub fn begin_render_pass(

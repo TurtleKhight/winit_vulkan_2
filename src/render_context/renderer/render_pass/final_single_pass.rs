@@ -23,7 +23,7 @@ pub struct FinalSingleRenderPass {
 }
 impl FinalSingleRenderPass {
     pub fn new(
-        device: &Arc<Device>,
+        device: Arc<Device>,
         swap_images: &[Arc<Image>],
         swap_image_format: Format,
         images: &[Arc<ImageView>],
@@ -60,14 +60,10 @@ impl FinalSingleRenderPass {
             ((0..=n).collect::<Vec<_>>(), None)
         };
 
-        let render_pass = single_pass_renderpass(
-            device.clone(),
-            &colour_attachments,
-            &colour,
-            depth_attachment,
-        );
+        let render_pass =
+            single_pass_renderpass(device, &colour_attachments, &colour, depth_attachment);
 
-        let framebuffers = Self::create_framebuffers(swap_images, &images, &render_pass);
+        let framebuffers = Self::create_framebuffers(swap_images, &images, render_pass.clone());
         Self {
             render_pass,
             framebuffers,
@@ -78,7 +74,7 @@ impl FinalSingleRenderPass {
     fn create_framebuffers(
         swap_images: &[Arc<Image>],
         images: &[Arc<ImageView>],
-        render_pass: &Arc<RenderPass>,
+        render_pass: Arc<RenderPass>,
     ) -> Vec<Arc<Framebuffer>> {
         let framebuffers = swap_images
             .iter()
@@ -103,7 +99,8 @@ impl FinalSingleRenderPass {
     }
 
     pub fn resize(&mut self, swap_images: &[Arc<Image>], images: &[Arc<ImageView>]) {
-        self.framebuffers = Self::create_framebuffers(swap_images, images, &self.render_pass);
+        self.framebuffers =
+            Self::create_framebuffers(swap_images, images, self.render_pass.clone());
     }
 
     pub fn begin_render_pass(

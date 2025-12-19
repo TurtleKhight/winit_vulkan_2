@@ -183,7 +183,6 @@ impl Texture {
 }
 
 pub struct Renderer {
-    device: Arc<Device>,
     mem_allocator: Arc<StandardMemoryAllocator>,
     set_allocator: Arc<StandardDescriptorSetAllocator>,
 
@@ -335,7 +334,6 @@ impl Renderer {
         );
 
         Self {
-            device,
             mem_allocator,
             set_allocator,
             vertex_buffers: vertex_buffer,
@@ -353,6 +351,7 @@ impl Renderer {
     ) {
         let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
         let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
+
         if fb_width <= 0.0 || fb_height <= 0.0 {
             return;
         }

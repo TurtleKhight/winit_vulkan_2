@@ -51,6 +51,7 @@ impl RenderContext {
     ) -> Self {
         let surface = Surface::from_window(vk_ctx.instance.clone(), window.clone()).unwrap();
         let window_size = window.inner_size();
+
         let (swapchain, images) = {
             let surface_capabilities = vk_ctx
                 .device
@@ -108,7 +109,13 @@ impl RenderContext {
         )
         .unwrap();
 
-        let renderer = Renderer::new(&vk_ctx, &mut builder, &images, swapchain.image_format());
+        let renderer = Renderer::new(
+            &vk_ctx,
+            &mut builder,
+            &images,
+            swapchain.image_format(),
+            config.extent(),
+        );
 
         let mut gui = if let Some(gui) = gui {
             gui
@@ -152,7 +159,6 @@ impl RenderContext {
 
     pub fn render(&mut self, vk_ctx: &VulkanContext) {
         let window_size = self.window.inner_size();
-
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
@@ -177,11 +183,15 @@ impl RenderContext {
 
             self.recreate_swapchain = false;
         }
+        if self.config.should_resize(&self.renderer.extent()) {
+            self.renderer.resize_buffers(&vk_ctx, self.config.extent())
+        }
 
         let (image_index, suboptimal, acquire_future) =
             match acquire_next_image(self.swapchain.clone(), None).map_err(Validated::unwrap) {
                 Ok(r) => r,
                 Err(VulkanError::OutOfDate) => {
+                    msgln!("Suboptimal: OutOfDate");
                     self.recreate_swapchain = true;
                     return;
                 }
