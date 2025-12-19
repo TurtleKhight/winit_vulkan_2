@@ -227,6 +227,10 @@ impl App {
 
     fn do_ui(&mut self) {
         let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let window_size = ren_ctx.window.inner_size();
+        if window_size.width == 0 || window_size.height == 0 {
+            return;
+        }
         ren_ctx
             .gui
             .ui(|ui| {

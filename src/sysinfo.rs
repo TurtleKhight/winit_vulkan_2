@@ -46,11 +46,11 @@ impl SysInfo {
 impl SysInfo {
     pub fn ui(&self, ui: &Ui) {
         if ui.collapsing_header("System Info", TreeNodeFlags::DEFAULT_OPEN) {
+            let avg = self.average_fps.sum() / self.average_fps.buf.len() as f32;
+            ui.text(format!("Avg FPS: {}", (1.0 / avg).round() as u32));
             ui.plot_lines("Fps", &self.average_fps.linear()).build();
             let mem_usage = self.mem_usage / (1024 * 1024);
             let vir_mem_usage = self.vir_mem_usage / (1024 * 1024);
-            let avg = self.average_fps.sum() / self.average_fps.buf.len() as f32;
-            ui.text(format!("Avg FPS: {}", (1.0 / avg).round() as u32));
             ui.text(format!("Memory usage: {} MB", mem_usage));
             ui.text(format!("Virtual memory: {} MB", vir_mem_usage));
         }

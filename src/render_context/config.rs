@@ -12,6 +12,21 @@ enum FramerateMode {
     Capped,
 }
 
+enum ResolutionMode {
+    Fixed,
+    FitWindow,
+}
+
+struct Resolution {
+    mode: ResolutionMode,
+    resolution: [u32; 2],
+}
+
+struct Framerate {
+    mode: FramerateMode,
+    framerate: f32,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct RenderConfig {
     // DEFAULT
@@ -123,22 +138,25 @@ impl RenderConfig {
                 FramerateMode::Unlimited,
             );
             ui.radio_button("Capped", &mut self.framerate_mode, FramerateMode::Capped);
-            let step = 15.0;
-            let min = 30.0;
-            let max = 300.0;
-            let value = &mut self.target_framerate;
+            ui.disabled(!(self.framerate_mode == FramerateMode::Capped), || {
+                let step = 15.0;
+                let min = 30.0;
+                let max = 300.0;
+                let value = &mut self.target_framerate;
 
-            let mut index: i32 = ((*value - min) / step).round() as i32;
-            let max_index = ((max - min) / step) as i32;
-            if ui
-                .slider_config("Fps", 0, max_index)
-                .flags(imgui::SliderFlags::NO_INPUT | imgui::SliderFlags::NO_ROUND_TO_FORMAT)
-                .display_format(format!("{}", *value as i32))
-                .build(&mut index)
-            {
-                *value = index as f32 * step + min;
-            }
-            ui.input_float("Fps Manual", value).build()
+                let mut index: i32 = ((*value - min) / step).round() as i32;
+                let max_index = ((max - min) / step) as i32;
+                if ui
+                    .slider_config("Fps", 0, max_index)
+                    .flags(imgui::SliderFlags::NO_INPUT | imgui::SliderFlags::NO_ROUND_TO_FORMAT)
+                    .display_format(format!("{}", *value as i32))
+                    .build(&mut index)
+                {
+                    *value = index as f32 * step + min;
+                }
+                ui.input_float("Fps Manual", value).build();
+            });
+            ui.separator();
             // ================================================================================================== GUI SCALE
             ui.input_scalar("Gui Scale", &mut self.gui_scale)
                 .step(0.25)
