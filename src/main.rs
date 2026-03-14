@@ -94,6 +94,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(size) => {
                 let size = Vector2::new(size.width, size.height);
+                ren_ctx.config.window_resized(size.into());
                 ren_ctx.recreate_swapchain = true;
                 self.game.camera.resize(size);
             }
@@ -128,7 +129,7 @@ impl ApplicationHandler for App {
                 self.do_ui();
                 self.sysinfo.update(self.dt);
                 let ren_ctx: &mut RenderContext = self.ren_ctx.as_mut().unwrap();
-                while !ren_ctx.config.should_render(self.last_render) {}
+                ren_ctx.config.wait_till_render(self.last_render);
                 self.last_render = std::time::Instant::now();
                 ren_ctx.renderer.update(self.dt, &self.game, &self.vk_ctx);
                 ren_ctx.render(&self.vk_ctx);
@@ -237,9 +238,12 @@ impl App {
                 ui.window("ImGui Window ").build(|| {
                     self.sysinfo.ui(ui);
                     self.vk_ctx.config.ui(ui);
-                    ren_ctx
-                        .config
-                        .ui(ui, &ren_ctx.swapchain, &mut ren_ctx.recreate_swapchain);
+                    ren_ctx.config.ui(
+                        ui,
+                        &ren_ctx.window,
+                        &ren_ctx.swapchain,
+                        &mut ren_ctx.recreate_swapchain,
+                    );
                     self.game.camera.ui(&ui);
                 });
             })
