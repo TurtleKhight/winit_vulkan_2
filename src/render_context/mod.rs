@@ -18,6 +18,7 @@ use winit::window::Window;
 use crate::{gui::Gui, msgln, vulkan::VulkanContext};
 
 mod config;
+mod config2;
 mod renderer;
 
 pub use config::RenderConfig;
@@ -52,49 +53,48 @@ impl RenderContext {
         let surface = Surface::from_window(vk_ctx.instance.clone(), window.clone()).unwrap();
         let window_size = window.inner_size();
 
-        let (swapchain, images) = {
-            let surface_capabilities = vk_ctx
-                .device
-                .physical_device()
-                .surface_capabilities(&surface, Default::default())
-                .unwrap();
+        let surface_capabilities = vk_ctx
+            .device
+            .physical_device()
+            .surface_capabilities(&surface, Default::default())
+            .unwrap();
 
-            let surface_formats = vk_ctx
-                .device
-                .physical_device()
-                .surface_formats(&surface, Default::default())
-                .unwrap();
+        let surface_formats = vk_ctx
+            .device
+            .physical_device()
+            .surface_formats(&surface, Default::default())
+            .unwrap();
 
-            let (image_format, _) = surface_formats[0];
+        let (image_format, _) = surface_formats[0];
 
-            let modes = vk_ctx
-                .device
-                .physical_device()
-                .surface_present_modes(&surface, SurfaceInfo::default())
-                .unwrap();
-            config.fallback_present_mode(&modes);
+        let modes = vk_ctx
+            .device
+            .physical_device()
+            .surface_present_modes(&surface, SurfaceInfo::default())
+            .unwrap();
 
-            Swapchain::new(
-                vk_ctx.device.clone(),
-                surface,
-                SwapchainCreateInfo {
-                    min_image_count: surface_capabilities.min_image_count.max(2),
-                    image_format,
-                    // image_format: vulkano::format::Format::B8G8R8A8_SRGB,
-                    image_extent: window_size.into(),
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
-                    present_mode: config.present_mode(),
-                    composite_alpha: surface_capabilities
-                        .supported_composite_alpha
-                        .into_iter()
-                        .next()
-                        .unwrap(),
+        config.fallback_present_mode(&modes);
 
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        };
+        let (swapchain, images) = Swapchain::new(
+            vk_ctx.device.clone(),
+            surface,
+            SwapchainCreateInfo {
+                min_image_count: surface_capabilities.min_image_count.max(2),
+                image_format,
+                // image_format: vulkano::format::Format::B8G8R8A8_SRGB,
+                image_extent: window_size.into(),
+                image_usage: ImageUsage::COLOR_ATTACHMENT,
+                present_mode: config.present_mode(),
+                composite_alpha: surface_capabilities
+                    .supported_composite_alpha
+                    .into_iter()
+                    .next()
+                    .unwrap(),
+
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
         let swapchain_viewport = Viewport {
             offset: [0.0, 0.0],
@@ -117,12 +117,8 @@ impl RenderContext {
             config.extent(),
         );
 
-        let mut gui = if let Some(gui) = gui {
-            gui
-        } else {
-            let gui = Gui::new(window.clone());
-            gui
-        };
+        let mut gui = gui.unwrap_or(Gui::new(window.clone()));
+
         gui.new_renderer(
             vk_ctx.device.clone(),
             vk_ctx.mem_alloc.clone(),
@@ -141,7 +137,7 @@ impl RenderContext {
             .unwrap()
             .wait(None)
             .unwrap();
-
+        msgln!("Surface Formats: {:?}", surface_formats);
         Self {
             window,
             swapchain,

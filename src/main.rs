@@ -49,8 +49,7 @@ struct App {
     last_render: std::time::Instant,
     dt: f32,
 
-    sysinfo: SysInfo,
-
+    // sysinfo: SysInfo,
     keyboard_input: KeyboardBinding,
     mouse_input: MouseBinding,
 }
@@ -58,7 +57,8 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = WindowAttributes::default();
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-        let ren_ctx = RenderContext::new(window, &self.vk_ctx, RenderConfig::default(), None);
+        let ren_ctx =
+            RenderContext::new(window.clone(), &self.vk_ctx, RenderConfig::default(), None);
         self.ren_ctx = Some(ren_ctx);
     }
 
@@ -84,7 +84,10 @@ impl ApplicationHandler for App {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let ren_ctx = match &mut self.ren_ctx {
+            Some(ren_ctx) => ren_ctx,
+            None => return,
+        };
         ren_ctx.gui.input(&event);
 
         match event {
@@ -127,7 +130,7 @@ impl ApplicationHandler for App {
                 self.last_frame = std::time::Instant::now();
                 self.keyboard_down();
                 self.do_ui();
-                self.sysinfo.update(self.dt);
+                // self.sysinfo.update(self.dt);
                 let ren_ctx: &mut RenderContext = self.ren_ctx.as_mut().unwrap();
                 ren_ctx.config.wait_till_render(self.last_render);
                 self.last_render = std::time::Instant::now();
@@ -141,7 +144,10 @@ impl ApplicationHandler for App {
 }
 impl App {
     fn keyboard_pressed(&mut self, event_loop: &ActiveEventLoop, physical_key: &PhysicalKey) {
-        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let ren_ctx = match &mut self.ren_ctx {
+            Some(ren_ctx) => ren_ctx,
+            None => return,
+        };
 
         match physical_key {
             PhysicalKey::Code(KeyCode::Escape) => {
@@ -186,7 +192,10 @@ impl App {
     }
 
     fn mouse_pressed(&mut self, button: MouseButton) {
-        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let ren_ctx = match &mut self.ren_ctx {
+            Some(ren_ctx) => ren_ctx,
+            None => return,
+        };
         match button {
             MouseButton::Left => {
                 let window = ren_ctx.window.clone();
@@ -207,7 +216,10 @@ impl App {
     }
 
     fn mouse_released(&mut self, button: MouseButton) {
-        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let ren_ctx = match &mut self.ren_ctx {
+            Some(ren_ctx) => ren_ctx,
+            None => return,
+        };
         match button {
             MouseButton::Left => {
                 let window = ren_ctx.window.clone();
@@ -227,22 +239,26 @@ impl App {
     }
 
     fn do_ui(&mut self) {
-        let ren_ctx = self.ren_ctx.as_mut().unwrap();
+        let ren_ctx = match &mut self.ren_ctx {
+            Some(ren_ctx) => ren_ctx,
+            None => return,
+        };
         let window_size = ren_ctx.window.inner_size();
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
         ren_ctx
             .gui
-            .ui(|ui| {
+            .ui(|ui: &mut imgui::Ui| {
                 ui.window("ImGui Window ").build(|| {
-                    self.sysinfo.ui(ui);
+                    // self.sysinfo.ui(ui);
                     self.vk_ctx.config.ui(ui);
                     ren_ctx.config.ui(
                         ui,
                         &ren_ctx.window,
                         &ren_ctx.swapchain,
                         &mut ren_ctx.recreate_swapchain,
+                        ren_ctx.renderer.get_gbuffers(),
                     );
                     self.game.camera.ui(&ui);
                 });
@@ -292,8 +308,7 @@ fn main() {
         last_frame: std::time::Instant::now(),
         last_render: std::time::Instant::now(),
 
-        sysinfo: SysInfo::new(),
-
+        // sysinfo: SysInfo::new(),
         keyboard_input: KeyboardBinding::new(),
         mouse_input: MouseBinding::new(),
     };

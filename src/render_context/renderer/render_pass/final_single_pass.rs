@@ -13,9 +13,12 @@ use vulkano::{
     },
 };
 
+use crate::msgln;
+
 use super::ColourAttachment;
 use super::single_pass_renderpass;
 
+// the final renderpass uses the swapchain in framebuffers
 pub struct FinalSingleRenderPass {
     pub render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
@@ -45,7 +48,7 @@ impl FinalSingleRenderPass {
         // Other attachments are next, depth being last
         for image in images {
             let attachment = ColourAttachment {
-                format: image.format(),
+                format: swap_image_format,
                 samples: 1,
                 load_op,
                 store_op,
@@ -78,10 +81,10 @@ impl FinalSingleRenderPass {
     ) -> Vec<Arc<Framebuffer>> {
         let framebuffers = swap_images
             .iter()
-            .map(|image| {
-                let final_colour = ImageView::new_default(image.clone()).unwrap();
+            .map(|swap_image| {
+                let swap_colour = ImageView::new_default(swap_image.clone()).unwrap();
                 let mut attachments = Vec::with_capacity(images.len() + 1);
-                attachments.push(final_colour);
+                attachments.push(swap_colour);
                 for image in images {
                     attachments.push(image.clone());
                 }

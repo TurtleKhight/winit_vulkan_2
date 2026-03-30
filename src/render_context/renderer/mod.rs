@@ -113,6 +113,10 @@ impl Renderer {
         self.render_passes.resize_swap(images);
     }
 
+    pub fn get_gbuffers(&self) -> &[Arc<ImageView>] {
+        &self.render_passes.forward_images
+    }
+
     pub fn resize_buffers(&mut self, vk_ctx: &VulkanContext, extent: [u32; 3]) {
         self.render_passes
             .resize_buffers(vk_ctx.device.clone(), vk_ctx.mem_alloc.clone(), extent);

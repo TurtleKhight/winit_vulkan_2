@@ -1,8 +1,12 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use imgui::{TreeNodeFlags, Ui};
 use vulkano::{
     device::DeviceOwned,
+    image::view::ImageView,
     swapchain::{PresentMode, SurfaceInfo, Swapchain},
 };
 
@@ -228,6 +232,7 @@ impl RenderConfig {
         window: &winit::window::Window,
         swapchain: &Swapchain,
         receate_swapchain: &mut bool,
+        gbuffers: &[Arc<ImageView>],
     ) {
         if ui.collapsing_header("Render Config", TreeNodeFlags::DEFAULT_OPEN) {
             // ================================================================================================== PRESENT MODE
